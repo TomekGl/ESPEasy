@@ -1,3 +1,4 @@
+.. include:: ../Plugin/_plugin_substitutions_p00x.repl
 .. _P000_page:
 
 |P000_typename|
@@ -23,6 +24,12 @@ Supported hardware
 ------------------
 
 |P000_usedby_GPIO|, |P000_usedby_RTTTL|
+
+Commands available
+------------------
+
+.. include:: P001_commands_GPIO.repl
+.. include:: P001_commands_RTTTL.repl
 
 Change log
 ----------

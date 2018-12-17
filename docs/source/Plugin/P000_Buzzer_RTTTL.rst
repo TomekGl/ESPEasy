@@ -1,3 +1,4 @@
+.. include:: ../Plugin/_plugin_substitutions_p00x.repl
 .. _P000_Buzzer_page:
 
 Buzzer (RTTTL)
@@ -88,7 +89,7 @@ No device is needed.
 Commands
 --------
 
-.. include:: P001_commands_RTTTL.rst
+.. include:: P001_commands_RTTTL.repl
 
 Where to buy
 ------------
