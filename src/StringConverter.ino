@@ -39,7 +39,12 @@ boolean str2ip(const char *string, byte* IP)
 
 
 String formatIP(const IPAddress& ip) {
+#if defined(ARDUINO_ESP8266_RELEASE_2_3_0)
+  IPAddress tmp(ip);
+  return tmp.toString();
+#else
   return ip.toString();
+#endif
 }
 
 void formatMAC(const uint8_t* mac, char (&strMAC)[20]) {
@@ -172,6 +177,7 @@ String doFormatUserVar(byte TaskIndex, byte rel_index, bool mustCheck, bool& isv
   float f(UserVar[BaseVarIndex + rel_index]);
   if (mustCheck && !isValidFloat(f)) {
     isvalid = false;
+#ifndef BUILD_NO_DEBUG
     if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
       String log = F("Invalid float value for TaskIndex: ");
       log += TaskIndex;
@@ -179,6 +185,7 @@ String doFormatUserVar(byte TaskIndex, byte rel_index, bool mustCheck, bool& isv
       log += rel_index;
       addLog(LOG_LEVEL_DEBUG, log);
     }
+#endif
     f = 0;
   }
   return toString(f, ExtraTaskSettings.TaskDeviceValueDecimals[rel_index]);
@@ -607,6 +614,7 @@ String getReplacementString(const String& format, String& s) {
   int startpos = s.indexOf(format);
   int endpos = s.indexOf('%', startpos + 1);
   String R = s.substring(startpos, endpos + 1);
+#ifndef BUILD_NO_DEBUG
   if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
     String log = F("ReplacementString SunTime: ");
     log += R;
@@ -614,6 +622,7 @@ String getReplacementString(const String& format, String& s) {
     log += getSecOffset(R);
     addLog(LOG_LEVEL_DEBUG, log);
   }
+#endif
   return R;
 }
 

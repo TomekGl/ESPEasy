@@ -1,7 +1,7 @@
 #ifndef ESPEASY_GLOBALS_H_
 #define ESPEASY_GLOBALS_H_
 
-#ifndef CORE_2_5_0
+#ifndef CORE_POST_2_5_0
   #define STR_HELPER(x) #x
   #define STR(x) STR_HELPER(x)
 #endif
@@ -37,6 +37,11 @@
 #define DEFAULT_IP_BLOCK_LEVEL 1                // 0: ALL_ALLOWED  1: LOCAL_SUBNET_ALLOWED  2: ONLY_IP_RANGE_ALLOWED
 
 #define DEFAULT_WIFI_CONNECTION_TIMEOUT  10000  // minimum timeout in ms for WiFi to be connected.
+#define DEFAULT_WIFI_FORCE_BG_MODE       false  // when set, only allow to connect in 802.11B or G mode (not N)
+#define DEFAULT_WIFI_RESTART_WIFI_CONN_LOST  false // Perform wifi off and on when connection was lost.
+#define DEFAULT_ECO_MODE                 false   // When set, make idle calls between executing tasks.
+#define DEFAULT_WIFI_NONE_SLEEP          false  // When set, the wifi will be set to no longer sleep (more power used and need reboot to reset mode)
+#define DEFAULT_GRATUITOUS_ARD           false  // When set, the node will send periodical gratuitous ARP packets to announce itself.
 
 // --- Default Controller ------------------------------------------------------------------------------
 #define DEFAULT_CONTROLLER   false              // true or false enabled or disabled, set 1st controller defaults
@@ -198,6 +203,7 @@
 // and some may need less memory. (which is stack allocated)
 
 #define NODE_TYPE_ID_ESP_EASY_STD           1
+#define NODE_TYPE_ID_RPI_EASY_STD           5  // https://github.com/enesbcs/rpieasy
 #define NODE_TYPE_ID_ESP_EASYM_STD         17
 #define NODE_TYPE_ID_ESP_EASY32_STD        33
 #define NODE_TYPE_ID_ARDUINO_EASY_STD      65
@@ -209,19 +215,21 @@
 #define TIMER_30SEC                         4
 #define TIMER_MQTT                          5
 #define TIMER_STATISTICS                    6
-#define TIMER_MQTT_DELAY_QUEUE              7
-#define TIMER_C001_DELAY_QUEUE              8
-#define TIMER_C003_DELAY_QUEUE              9
-#define TIMER_C004_DELAY_QUEUE             10
-#define TIMER_C007_DELAY_QUEUE             11
-#define TIMER_C008_DELAY_QUEUE             12
-#define TIMER_C009_DELAY_QUEUE             13
-#define TIMER_C010_DELAY_QUEUE             14
-#define TIMER_C011_DELAY_QUEUE             15
-#define TIMER_C012_DELAY_QUEUE             16
-#define TIMER_C013_DELAY_QUEUE             17
+#define TIMER_GRATUITOUS_ARP                7
+#define TIMER_MQTT_DELAY_QUEUE              8
+#define TIMER_C001_DELAY_QUEUE              9
+#define TIMER_C003_DELAY_QUEUE             10
+#define TIMER_C004_DELAY_QUEUE             11
+#define TIMER_C007_DELAY_QUEUE             12
+#define TIMER_C008_DELAY_QUEUE             13
+#define TIMER_C009_DELAY_QUEUE             14
+#define TIMER_C010_DELAY_QUEUE             15
+#define TIMER_C011_DELAY_QUEUE             16
+#define TIMER_C012_DELAY_QUEUE             17
+#define TIMER_C013_DELAY_QUEUE             18
 
-#define TIMING_STATS_THRESHOLD         100000
+#define TIMING_STATS_THRESHOLD             100000
+#define TIMER_GRATUITOUS_ARP_MAX           5000
 
 // Minimum delay between messages for a controller to send in msec.
 #define CONTROLLER_DELAY_QUEUE_DELAY_MAX   3600000
@@ -265,18 +273,20 @@
 #define PLUGIN_UNCONDITIONAL_POLL          25
 #define PLUGIN_REQUEST                     26
 #define PLUGIN_TIME_CHANGE                 27
+#define PLUGIN_MONITOR                     28
 
-#define CPLUGIN_PROTOCOL_ADD                1
-#define CPLUGIN_PROTOCOL_TEMPLATE           2
-#define CPLUGIN_PROTOCOL_SEND               3
-#define CPLUGIN_PROTOCOL_RECV               4
-#define CPLUGIN_GET_DEVICENAME              5
-#define CPLUGIN_WEBFORM_SAVE                6
-#define CPLUGIN_WEBFORM_LOAD                7
-#define CPLUGIN_GET_PROTOCOL_DISPLAY_NAME   8
-#define CPLUGIN_TASK_CHANGE_NOTIFICATION    9
-#define CPLUGIN_INIT                       10
-#define CPLUGIN_UDP_IN                     11
+// Make sure the CPLUGIN_* does not overlap PLUGIN_*
+#define CPLUGIN_PROTOCOL_ADD               41
+#define CPLUGIN_PROTOCOL_TEMPLATE          42
+#define CPLUGIN_PROTOCOL_SEND              43
+#define CPLUGIN_PROTOCOL_RECV              44
+#define CPLUGIN_GET_DEVICENAME             45
+#define CPLUGIN_WEBFORM_SAVE               46
+#define CPLUGIN_WEBFORM_LOAD               47
+#define CPLUGIN_GET_PROTOCOL_DISPLAY_NAME  48
+#define CPLUGIN_TASK_CHANGE_NOTIFICATION   49
+#define CPLUGIN_INIT                       50
+#define CPLUGIN_UDP_IN                     51
 
 #define CONTROLLER_HOSTNAME                 1
 #define CONTROLLER_IP                       2
@@ -421,8 +431,10 @@
   #define CONFIG_FILE_SIZE               131072
 #endif
 
+
 // Forward declaration
 struct ControllerSettingsStruct;
+static String getUnknownString();
 void scheduleNextDelayQueue(unsigned long id, unsigned long nextTime);
 String LoadControllerSettings(int ControllerIndex, ControllerSettingsStruct& controller_settings);
 String get_formatted_Controller_number(int controller_index);
@@ -438,6 +450,8 @@ bool canYield();
 bool getBitFromUL(uint32_t number, byte bitnr);
 void setBitToUL(uint32_t& number, byte bitnr, bool value);
 
+void serialHelper_getGpioNames(struct EventStruct *event, bool rxOptional=false, bool txOptional=false);
+
 enum SettingsType {
   BasicSettings_Type = 0,
   TaskSettings_Type,
@@ -449,21 +463,11 @@ enum SettingsType {
   SettingsType_MAX
 
 };
+String getSettingsTypeString(SettingsType settingsType);
 bool getSettingsParameters(SettingsType settingsType, int index, int& offset, int& max_size);
-String getSettingsTypeString(SettingsType settingsType) {
-  switch (settingsType) {
-    case BasicSettings_Type:            return F("Settings");
-    case TaskSettings_Type:             return F("TaskSettings");
-    case CustomTaskSettings_Type:       return F("CustomTaskSettings");
-    case ControllerSettings_Type:       return F("ControllerSettings");
-    case CustomControllerSettings_Type: return F("CustomControllerSettings");
-    case NotificationSettings_Type:     return F("NotificationSettings");
-    default:
-      break;
-  }
-  return String();
-}
+#ifndef BUILD_MINIMAL_OTA
 bool showSettingsFileLayout = false;
+#endif
 
 /*
         To modify the stock configuration without changing this repo file :
@@ -549,10 +553,11 @@ bool showSettingsFileLayout = false;
   #define FILE_NOTIFICATION "/notification.dat"
   #define FILE_RULES        "/rules1.txt"
   #include <WiFi.h>
-  #include  "esp32_ping.h"
+//  #include  "esp32_ping.h"
   #include <WebServer.h>
   #include "SPIFFS.h"
   #include <rom/rtc.h>
+  #include "esp_wifi.h" // Needed to call ESP-IDF functions like esp_wifi_....
   WebServer WebServer(80);
   #ifdef FEATURE_MDNS
     #include <ESPmDNS.h>
@@ -602,9 +607,6 @@ const byte DNS_PORT = 53;
 IPAddress apIP(DEFAULT_AP_IP);
 DNSServer dnsServer;
 bool dnsServerActive = false;
-#ifdef FEATURE_MDNS
-MDNSResponder mdns;
-#endif
 
 // MQTT client
 WiFiClient mqtt;
@@ -680,6 +682,7 @@ struct SecurityStruct
     }
     memset(Password, 0, sizeof(Password));
   }
+
   char          WifiSSID[32];
   char          WifiKey[64];
   char          WifiSSID2[32];
@@ -727,6 +730,21 @@ struct SettingsStruct
   bool OldRulesEngine() {  return !getBitFromUL(VariousBits1, 3); }
   void OldRulesEngine(bool value) {  setBitToUL(VariousBits1, 3, !value); }
 
+  bool ForceWiFi_bg_mode() {  return getBitFromUL(VariousBits1, 4); }
+  void ForceWiFi_bg_mode(bool value) {  setBitToUL(VariousBits1, 4, value); }
+
+  bool WiFiRestart_connection_lost() {  return getBitFromUL(VariousBits1, 5); }
+  void WiFiRestart_connection_lost(bool value) {  setBitToUL(VariousBits1, 5, value); }
+
+  bool EcoPowerMode() {  return getBitFromUL(VariousBits1, 6); }
+  void EcoPowerMode(bool value) {  setBitToUL(VariousBits1, 6, value); }
+
+  bool WifiNoneSleep() {  return getBitFromUL(VariousBits1, 7); }
+  void WifiNoneSleep(bool value) {  setBitToUL(VariousBits1, 7, value); }
+
+  // Enable send gratuitous ARP by default, so invert the values (default = 0)
+  bool gratuitousARP() {  return !getBitFromUL(VariousBits1, 8); }
+  void gratuitousARP(bool value) {  setBitToUL(VariousBits1, 8, !value); }
 
   void validate() {
     if (UDPPort > 65535) UDPPort = 0;
@@ -829,6 +847,11 @@ struct SettingsStruct
     MQTTUseUnitNameAsClientId = 0;
     VariousBits1 = 0;
     OldRulesEngine(DEFAULT_RULES_OLDENGINE);
+    ForceWiFi_bg_mode(DEFAULT_WIFI_FORCE_BG_MODE);
+    WiFiRestart_connection_lost(DEFAULT_WIFI_RESTART_WIFI_CONN_LOST);
+    EcoPowerMode(DEFAULT_ECO_MODE);
+    WifiNoneSleep(DEFAULT_WIFI_NONE_SLEEP);
+    gratuitousARP(DEFAULT_GRATUITOUS_ARD);
   }
 
   void clearAll() {
@@ -968,12 +991,29 @@ SettingsStruct* SettingsStruct_ptr = new SettingsStruct;
 SettingsStruct& Settings = *SettingsStruct_ptr;
 */
 
+String ReportOffsetErrorInStruct(const String& structname, size_t offset) {
+  String error;
+  error.reserve(48 + structname.length());
+  error = F("Error: Incorrect offset in struct: ");
+  error += structname;
+  error += '(';
+  error += String(offset);
+  error += ')';
+  return error;
+}
+
 /*********************************************************************************************\
  *  Analyze SettingsStruct and report inconsistencies
  *  Not a member function to be able to use the F-macro
 \*********************************************************************************************/
 bool SettingsCheck(String& error) {
   error = "";
+#ifdef esp8266
+  size_t offset = offsetof(SettingsStruct, ResetFactoryDefaultPreference);
+  if (offset != 1224) {
+    error = ReportOffsetErrorInStruct(F("SettingsStruct"), offset);
+  }
+#endif
   if (!Settings.networkSettingsEmpty()) {
     if (Settings.IP[0] == 0 || Settings.Gateway[0] == 0 || Settings.Subnet[0] == 0 || Settings.DNS[0] == 0) {
       error += F("Error: Either fill all IP settings fields or leave all empty");
@@ -1023,6 +1063,8 @@ struct ControllerSettingsStruct
       MinimalTimeBetweenMessages = CONTROLLER_DELAY_QUEUE_DELAY_DFLT;
     if (MaxQueueDepth > CONTROLLER_DELAY_QUEUE_DEPTH_MAX) MaxQueueDepth = CONTROLLER_DELAY_QUEUE_DEPTH_DFLT;
     if (MaxRetry > CONTROLLER_DELAY_QUEUE_RETRY_MAX) MaxRetry = CONTROLLER_DELAY_QUEUE_RETRY_MAX;
+    if (MaxQueueDepth == 0) MaxQueueDepth = CONTROLLER_DELAY_QUEUE_DEPTH_DFLT;
+    if (MaxRetry == 0) MaxRetry = CONTROLLER_DELAY_QUEUE_RETRY_DFLT;
     if (ClientTimeout < 10 || ClientTimeout > CONTROLLER_CLIENTTIMEOUT_MAX) {
       ClientTimeout = CONTROLLER_CLIENTTIMEOUT_DFLT;
     }
@@ -1603,6 +1645,7 @@ struct rulesTimerStatus
 
 msecTimerHandlerStruct msecTimerHandler;
 
+unsigned long timer_gratuitous_arp_interval = 5000;
 unsigned long timermqtt_interval = 250;
 unsigned long lastSend = 0;
 unsigned long lastWeb = 0;
@@ -1624,7 +1667,7 @@ boolean (*Plugin_ptr[PLUGIN_MAX])(byte, struct EventStruct*, String&);
 std::vector<byte> Plugin_id;
 std::vector<int> Task_id_to_Plugin_id;
 
-boolean (*CPlugin_ptr[CPLUGIN_MAX])(byte, struct EventStruct*, String&);
+bool (*CPlugin_ptr[CPLUGIN_MAX])(byte, struct EventStruct*, String&);
 byte CPlugin_id[CPLUGIN_MAX];
 
 boolean (*NPlugin_ptr[NPLUGIN_MAX])(byte, struct EventStruct*, String&);
@@ -1865,7 +1908,7 @@ String getPluginFunctionName(int function) {
         case PLUGIN_UNCONDITIONAL_POLL:    return F("UNCONDITIONAL_POLL");
         case PLUGIN_REQUEST:               return F("REQUEST");
     }
-    return F("Unknown");
+    return getUnknownString();
 }
 
 bool mustLogFunction(int function) {
@@ -1900,51 +1943,94 @@ bool mustLogFunction(int function) {
     return false;
 }
 
+String getCPluginCFunctionName(int function) {
+    switch(function) {
+        case CPLUGIN_PROTOCOL_ADD:              return F("CPLUGIN_PROTOCOL_ADD");
+        case CPLUGIN_PROTOCOL_TEMPLATE:         return F("CPLUGIN_PROTOCOL_TEMPLATE");
+        case CPLUGIN_PROTOCOL_SEND:             return F("CPLUGIN_PROTOCOL_SEND");
+        case CPLUGIN_PROTOCOL_RECV:             return F("CPLUGIN_PROTOCOL_RECV");
+        case CPLUGIN_GET_DEVICENAME:            return F("CPLUGIN_GET_DEVICENAME");
+        case CPLUGIN_WEBFORM_SAVE:              return F("CPLUGIN_WEBFORM_SAVE");
+        case CPLUGIN_WEBFORM_LOAD:              return F("CPLUGIN_WEBFORM_LOAD");
+        case CPLUGIN_GET_PROTOCOL_DISPLAY_NAME: return F("CPLUGIN_GET_PROTOCOL_DISPLAY_NAME");
+        case CPLUGIN_TASK_CHANGE_NOTIFICATION:  return F("CPLUGIN_TASK_CHANGE_NOTIFICATION");
+        case CPLUGIN_INIT:                      return F("CPLUGIN_INIT");
+        case CPLUGIN_UDP_IN:                    return F("CPLUGIN_UDP_IN");
+    }
+    return getUnknownString();
+}
+
+bool mustLogCFunction(int function) {
+    switch(function) {
+        case CPLUGIN_PROTOCOL_ADD:              return false;
+        case CPLUGIN_PROTOCOL_TEMPLATE:         return false;
+        case CPLUGIN_PROTOCOL_SEND:             return true;
+        case CPLUGIN_PROTOCOL_RECV:             return true;
+        case CPLUGIN_GET_DEVICENAME:            return false;
+        case CPLUGIN_WEBFORM_SAVE:              return false;
+        case CPLUGIN_WEBFORM_LOAD:              return false;
+        case CPLUGIN_GET_PROTOCOL_DISPLAY_NAME: return false;
+        case CPLUGIN_TASK_CHANGE_NOTIFICATION:  return false;
+        case CPLUGIN_INIT:                      return false;
+        case CPLUGIN_UDP_IN:                    return true;
+    }
+    return false;
+}
+
 std::map<int,TimingStats> pluginStats;
+std::map<int,TimingStats> controllerStats;
 std::map<int,TimingStats> miscStats;
 unsigned long timediff_calls = 0;
 unsigned long timediff_cpu_cycles_total = 0;
 unsigned long timingstats_last_reset = 0;
 
-#define LOADFILE_STATS        0
-#define SAVEFILE_STATS        1
-#define LOOP_STATS            2
-#define PLUGIN_CALL_50PS      3
-#define PLUGIN_CALL_10PS      4
-#define PLUGIN_CALL_10PSU     5
-#define PLUGIN_CALL_1PS       6
-#define SENSOR_SEND_TASK      7
-#define SEND_DATA_STATS       8
-#define COMPUTE_FORMULA_STATS 9
-#define PROC_SYS_TIMER       10
-#define SET_NEW_TIMER        11
-#define TIME_DIFF_COMPUTE    12
-#define MQTT_DELAY_QUEUE     13
-#define C001_DELAY_QUEUE     14
-#define C002_DELAY_QUEUE     15
-#define C003_DELAY_QUEUE     16
-#define C004_DELAY_QUEUE     17
-#define C005_DELAY_QUEUE     18
-#define C006_DELAY_QUEUE     19
-#define C007_DELAY_QUEUE     20
-#define C008_DELAY_QUEUE     21
-#define C009_DELAY_QUEUE     22
-#define C010_DELAY_QUEUE     23
-#define C011_DELAY_QUEUE     24
-#define C012_DELAY_QUEUE     25
-#define C013_DELAY_QUEUE     26
-#define TRY_CONNECT_HOST_TCP 27
-#define TRY_CONNECT_HOST_UDP 28
-#define HOST_BY_NAME_STATS   29
-#define CONNECT_CLIENT_STATS 30
-#define LOAD_CUSTOM_TASK_STATS 31
-#define WIFI_ISCONNECTED_STATS 32
+#define LOADFILE_STATS          0
+#define SAVEFILE_STATS          1
+#define LOOP_STATS              2
+#define PLUGIN_CALL_50PS        3
+#define PLUGIN_CALL_10PS        4
+#define PLUGIN_CALL_10PSU       5
+#define PLUGIN_CALL_1PS         6
+#define SENSOR_SEND_TASK        7
+#define SEND_DATA_STATS         8
+#define COMPUTE_FORMULA_STATS   9
+#define PROC_SYS_TIMER          10
+#define SET_NEW_TIMER           11
+#define TIME_DIFF_COMPUTE       12
+#define MQTT_DELAY_QUEUE        13
+#define C001_DELAY_QUEUE        14
+#define C002_DELAY_QUEUE        15
+#define C003_DELAY_QUEUE        16
+#define C004_DELAY_QUEUE        17
+#define C005_DELAY_QUEUE        18
+#define C006_DELAY_QUEUE        19
+#define C007_DELAY_QUEUE        20
+#define C008_DELAY_QUEUE        21
+#define C009_DELAY_QUEUE        22
+#define C010_DELAY_QUEUE        23
+#define C011_DELAY_QUEUE        24
+#define C012_DELAY_QUEUE        25
+#define C013_DELAY_QUEUE        26
+#define TRY_CONNECT_HOST_TCP    27
+#define TRY_CONNECT_HOST_UDP    28
+#define HOST_BY_NAME_STATS      29
+#define CONNECT_CLIENT_STATS    30
+#define LOAD_CUSTOM_TASK_STATS  31
+#define WIFI_ISCONNECTED_STATS  32
+#define WIFI_NOTCONNECTED_STATS 33
+#define LOAD_TASK_SETTINGS      34
+#define RULES_PROCESSING        35
+#define GRAT_ARP_STATS          36
+#define BACKGROUND_TASKS        37
+#define HANDLE_SCHEDULER_IDLE   38
+#define HANDLE_SCHEDULER_TASK   39
 
 
 
 
 #define START_TIMER const unsigned statisticsTimerStart(micros());
-#define STOP_TIMER_TASK(T,F)  if (mustLogFunction(F)) pluginStats[T*32 + F].add(usecPassedSince(statisticsTimerStart));
+#define STOP_TIMER_TASK(T,F)  if (mustLogFunction(F)) pluginStats[T*256 + F].add(usecPassedSince(statisticsTimerStart));
+#define STOP_TIMER_CONTROLLER(T,F)  if (mustLogCFunction(F)) controllerStats[T*256 + F].add(usecPassedSince(statisticsTimerStart));
 //#define STOP_TIMER_LOADFILE miscStats[LOADFILE_STATS].add(usecPassedSince(statisticsTimerStart));
 #define STOP_TIMER(L)       miscStats[L].add(usecPassedSince(statisticsTimerStart));
 
@@ -1971,6 +2057,13 @@ String getMiscStatsName(int stat) {
         case CONNECT_CLIENT_STATS:  return F("connectClient()");
         case LOAD_CUSTOM_TASK_STATS: return F("LoadCustomTaskSettings()");
         case WIFI_ISCONNECTED_STATS: return F("WiFi.isConnected()");
+        case WIFI_NOTCONNECTED_STATS: return F("WiFi.isConnected() (fail)");
+        case LOAD_TASK_SETTINGS:     return F("LoadTaskSettings()");
+        case RULES_PROCESSING:       return F("rulesProcessing()");
+        case GRAT_ARP_STATS:         return F("sendGratuitousARP()");
+        case BACKGROUND_TASKS:       return F("backgroundtasks()");
+        case HANDLE_SCHEDULER_IDLE:  return F("handle_schedule() idle");
+        case HANDLE_SCHEDULER_TASK:  return F("handle_schedule() task");
         case C001_DELAY_QUEUE:
         case C002_DELAY_QUEUE:
         case C003_DELAY_QUEUE:
@@ -1992,12 +2085,12 @@ String getMiscStatsName(int stat) {
           return result;
         }
     }
-    return F("Unknown");
+    return getUnknownString();
 }
 
 
 struct portStatusStruct {
-  portStatusStruct() : state(-1), output(-1), command(0), init(0), mode(0), task(0), monitor(0),  previousTask(-1) {}
+  portStatusStruct() : state(-1), output(-1), command(0), init(0), mode(0), task(0), monitor(0), forceMonitor(0), forceEvent(0), previousTask(-1), x(-1) {}
 
   int8_t state : 2; //-1,0,1
   int8_t output : 2; //-1,0,1
@@ -2005,10 +2098,14 @@ struct portStatusStruct {
   int8_t init : 2; //0,1
 
   uint8_t mode : 3; //6 current values (max. 8)
-  uint8_t task : 4; //0-15 (max. 16)
+  uint8_t task : 2; //0-3 (max. 4)
   uint8_t monitor : 1; //0,1
+  uint8_t forceMonitor : 1; //0,1
+  uint8_t forceEvent : 1; //0,1
 
   int8_t previousTask : 8;
+
+  int8_t x; //used to synchronize the Plugin_prt vector index (x) with the PLUGIN_ID
 };
 
 std::map<uint32_t, portStatusStruct> globalMapPortStatus;

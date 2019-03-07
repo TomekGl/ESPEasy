@@ -47,16 +47,19 @@ void sendData(struct EventStruct *event)
     {
       event->ProtocolIndex = getProtocolIndex(Settings.Protocol[event->ControllerIndex]);
       if (validUserVar(event)) {
-        CPlugin_ptr[event->ProtocolIndex](CPLUGIN_PROTOCOL_SEND, event, dummyString);
-      } else {
+        CPluginCall(event->ProtocolIndex, CPLUGIN_PROTOCOL_SEND, event, dummyString);
+      }
+#ifndef BUILD_NO_DEBUG
+        else {
         if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
           String log = F("Invalid value detected for controller ");
           String controllerName;
-          CPlugin_ptr[event->ProtocolIndex](CPLUGIN_GET_DEVICENAME, event, controllerName);
+          CPluginCall(event->ProtocolIndex, CPLUGIN_GET_DEVICENAME, event, controllerName);
           log += controllerName;
           addLog(LOG_LEVEL_DEBUG, log);
         }
       }
+#endif
     }
   }
 
@@ -156,6 +159,7 @@ bool MQTTConnect(int controller_idx)
     clientid = F("ESPClient_");
     clientid += WiFi.macAddress();
   }
+  clientid.replace(' ', '_'); // Make sure no spaces are present in the client ID
   if (wifi_reconnects >= 1 && Settings.uniqueMQTTclientIdReconnect()) {
     // Work-around for 'lost connections' to the MQTT broker.
     // If the broker thinks the connection is still alive, a reconnect from the
@@ -257,7 +261,7 @@ bool MQTTCheck(int controller_idx)
 /*********************************************************************************************\
  * Send status info to request source
 \*********************************************************************************************/
-void SendStatusOnlyIfNeeded(int eventSource, bool param1, uint32_t key, const String& param2, uint16_t param3) {
+void SendStatusOnlyIfNeeded(int eventSource, bool param1, uint32_t key, const String& param2, int16_t param3) {
   switch (eventSource) {
     case VALUE_SOURCE_HTTP:
     case VALUE_SOURCE_SERIAL:
@@ -306,12 +310,14 @@ void processMQTTdelayQueue() {
     MQTTDelayHandler.markProcessed(true);
   } else {
     MQTTDelayHandler.markProcessed(false);
+#ifndef BUILD_NO_DEBUG
     if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
       String log = F("MQTT : process MQTT queue not published, ");
       log += MQTTDelayHandler.sendQueue.size();
       log += F(" items left in queue");
       addLog(LOG_LEVEL_DEBUG, log);
     }
+#endif
   }
   scheduleNextMQTTdelayQueue();
   STOP_TIMER(MQTT_DELAY_QUEUE);

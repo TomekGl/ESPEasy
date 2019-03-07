@@ -9,9 +9,9 @@
 
 #include <ArduinoJson.h>
 
-boolean CPlugin_002(byte function, struct EventStruct *event, String& string)
+bool CPlugin_002(byte function, struct EventStruct *event, String& string)
 {
-  boolean success = false;
+  bool success = false;
 
   switch (function)
   {
@@ -198,9 +198,11 @@ boolean CPlugin_002(byte function, struct EventStruct *event, String& string)
 
           String json;
           root.printTo(json);
+#ifndef BUILD_NO_DEBUG
           String log = F("MQTT : ");
           log += json;
           addLog(LOG_LEVEL_DEBUG, log);
+#endif
 
           String pubname = ControllerSettings.Publish;
           parseControllerVariables(pubname, event, false);

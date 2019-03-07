@@ -202,6 +202,7 @@ void afterloadSettings() {
   if (modelMatchingFlashSize(model)) {
     ResetFactoryDefaultPreference = Settings.ResetFactoryDefaultPreference;
   }
+  msecTimerHandler.setEcoMode(Settings.EcoPowerMode());
 }
 
 /********************************************************************************************\
@@ -373,6 +374,7 @@ int getFileSize(SettingsType settingsType) {
 }
 
 bool getAndLogSettingsParameters(bool read, SettingsType settingsType, int index, int& offset, int& max_size) {
+#ifndef BUILD_NO_DEBUG
   if (loglevelActiveFor(LOG_LEVEL_DEBUG_DEV)) {
     String log = read ? F("Read") : F("Write");
     log += F(" settings: ");
@@ -381,6 +383,7 @@ bool getAndLogSettingsParameters(bool read, SettingsType settingsType, int index
     log += index;
     addLog(LOG_LEVEL_DEBUG_DEV, log);
   }
+#endif
   return getSettingsParameters(settingsType, index, offset, max_size);
 }
 
@@ -419,6 +422,7 @@ String LoadTaskSettings(byte TaskIndex)
   checkRAM(F("LoadTaskSettings"));
   if (ExtraTaskSettings.TaskIndex == TaskIndex)
     return(String()); //already loaded
+  START_TIMER
   ExtraTaskSettings.clear();
   String result = "";
   result = LoadFromFile(TaskSettings_Type, TaskIndex, (char*)FILE_CONFIG, (byte*)&ExtraTaskSettings, sizeof(struct ExtraTaskSettingsStruct));
@@ -433,6 +437,7 @@ String LoadTaskSettings(byte TaskIndex)
     //the plugin call should populate ExtraTaskSettings with its default values.
     PluginCall(PLUGIN_GET_DEVICEVALUENAMES, &TempEvent, dummyString);
   }
+  STOP_TIMER(LOAD_TASK_SETTINGS);
 
   return result;
 }
